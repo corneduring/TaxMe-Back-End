@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 )
 
@@ -26,20 +27,40 @@ func Login(database *sql.DB) http.HandlerFunc {
 		data, err := ioutil.ReadAll(request.Body)
 		if err != nil {
 			fmt.Println(err)
+			writer.Write([]byte("Could not read your login data!"))
 		}
 
 		//Convert the JSON string into a struct
 		var userLoginData LoginData
 		if err := json.Unmarshal(data, &userLoginData); err != nil {
 			fmt.Println(err)
+			writer.Write([]byte("Could not read your login data!"))
 		}
 
 		//Validate whether a user has entered an existing email when trying to log in
-		row, err := database.Query("SELECT * FROM users WHERE email = ?", userLoginData.Email)
+		result, err := database.Exec("SELECT * FROM users WHERE email=$1", userLoginData.Email)
 		if err != nil {
 			fmt.Println(err)
-		} else {
-			fmt.Println(row)
+		}
+
+		valid, _ := result.RowsAffected()
+		if valid != 1 {
+			log.Printf("The email '%s' does not exist!", userLoginData.Email)
+			writer.Write([]byte("The email you entered does not exist. Try signing up for an account."))
+			return
+		}
+
+		//Validate whether the password entered by the user matches the corresponding email in the database
+		result, err = database.Exec("SELECT * FROM users WHERE email=$1 AND password=$2", userLoginData.Email, userLoginData.Password)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		valid, _ = result.RowsAffected()
+		if valid != 1 {
+			log.Println("The password does not match the email entered!", userLoginData.Email)
+			writer.Write([]byte("Your password is invalid!"))
+			return
 		}
 	}
 }
