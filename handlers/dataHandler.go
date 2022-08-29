@@ -38,7 +38,8 @@ func Login(database *sql.DB) http.HandlerFunc {
 
 		//Parse the JSON string into a struct
 		var loginData LoginData
-		if err := json.Unmarshal(data, &loginData); err != nil {
+		err = json.Unmarshal(data, &loginData)
+		if err != nil {
 			writer.Write([]byte("Could not read your login data!"))
 		}
 
@@ -111,18 +112,18 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		//Validate whether the user's passwords match
+		////Validate whether the user's passwords match
 		if signUpData.Password1 != signUpData.Password2 {
 			writer.Write([]byte("Your passwords don't match!"))
 			return
 		}
 
-		_, err = database.Exec("INSERT INTO users VALUES ($1, $2)", signUpData.Email, signUpData.Password1)
+		_, err = database.Exec("INSERT INTO users(email, password) VALUES ($1, $2)", signUpData.Email, signUpData.Password1)
 	}
 }
 
 func isEmail(email string) (bool, error) {
-	valid, err := regexp.MatchString("^([a-z|\\d]+[\\.|\\-|_]?[a-z|\\d]+)+@([a-z|\\d]+\\-?[a-z|\\d]+)+\\.[a-z]{2}$", email)
+	valid, err := regexp.MatchString("^([a-z|\\d]+[\\.|\\-|_]?[a-z|\\d]+)+@([a-z|\\d]+\\-?[a-z|\\d]+)+\\.[a-z]{2,3}$", email)
 	if err != nil {
 		log.Println(err)
 		return false, errors.New("Could not validate email!")
@@ -140,22 +141,36 @@ func isEmail(email string) (bool, error) {
 }
 
 func isPassword(password string) (bool, error) {
-	valid, err := regexp.MatchString("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,10}$", password)
-	if err != nil {
-		log.Println(err)
-		return false, errors.New("Could not validate password!")
+	var valid bool
+	var err error
+	var upper, lower, number, special, length bool
+
+	//Check if the password contains at least one upper case character
+	if upper, _ = regexp.MatchString(`[A-Z]+`, password); !upper {
+		err = errors.New("Your password must contain at least one upper case character")
 	}
 
-	if !valid {
-		return false, errors.New(
-			"Your password must match the following criteria:" +
-				"Minimum of 8 characters" +
-				"Maximum of 40 characters" +
-				"At least one uppercase letter" +
-				"At least one lower case letter" +
-				"At least one number" +
-				"At least one special character")
+	//Check if the password contains at least one lower case character
+	if lower, _ = regexp.MatchString(`[a-z]+`, password); !lower {
+		err = errors.New("Your password must contain at least one lower case character")
 	}
 
-	return true, nil
+	//Check if the password contains at least one number
+	if number, _ = regexp.MatchString(`\d+`, password); !number {
+		err = errors.New("Your password must contain at least one number")
+	}
+
+	//Check if the password contains at least one special character
+	if special, _ = regexp.MatchString(`[^\w\s]+`, password); !special {
+		err = errors.New("Your password must contain at least one special character")
+	}
+
+	//Check if the password is at least 6 characters long
+	if length = len(password) >= 6; !length {
+		err = errors.New("Your password must be at least 6 characters long")
+	}
+
+	valid = upper && lower && number && special && length
+
+	return valid, err
 }
