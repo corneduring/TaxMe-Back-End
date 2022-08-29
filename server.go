@@ -11,6 +11,7 @@ func main() {
 	database := db.ConnectDatabase()
 
 	http.HandleFunc("/login", dataHandlers.Login(database))
+	http.HandleFunc("/signup", dataHandlers.SignUp(database))
 
 	defer database.Close()
 

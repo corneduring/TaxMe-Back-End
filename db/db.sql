@@ -22,3 +22,4 @@ CREATE TABLE calculations (
 );
 
 INSERT INTO users(email, password) VALUES ('corne@gmail.com', 'asdf');
+INSERT INTO users(email, password) VALUES ('asdf', 'asdf');
