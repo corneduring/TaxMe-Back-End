@@ -99,20 +99,20 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 		}
 
 		//Validate the syntax of the email entered
-		validEmail, err := isEmail(signUpData.Email)
+		validEmail, err := validateEmail(signUpData.Email)
 		if !validEmail {
 			writer.Write([]byte(err.Error()))
 			return
 		}
 
 		//Validate the user's passwords to make it more secure
-		validPassword, err := isPassword(signUpData.Password1)
+		validPassword, err := validatePassword(signUpData.Password1)
 		if !validPassword {
 			writer.Write([]byte(err.Error()))
 			return
 		}
 
-		////Validate whether the user's passwords match
+		//Validate whether the user's passwords match
 		if signUpData.Password1 != signUpData.Password2 {
 			writer.Write([]byte("Your passwords don't match!"))
 			return
@@ -122,8 +122,8 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 	}
 }
 
-func isEmail(email string) (bool, error) {
-	valid, err := regexp.MatchString("^([a-z|\\d]+[\\.|\\-|_]?[a-z|\\d]+)+@([a-z|\\d]+\\-?[a-z|\\d]+)+\\.[a-z]{2,3}$", email)
+func validateEmail(email string) (bool, error) {
+	valid, err := regexp.MatchString(`^([a-z|\d]+[\.|\-|_]?[a-z|\d]+)+@([a-z|\d]+\-?[a-z|\d]+)+\.[a-z]{2,63}$`, email)
 	if err != nil {
 		log.Println(err)
 		return false, errors.New("Could not validate email!")
@@ -140,7 +140,7 @@ func isEmail(email string) (bool, error) {
 	return true, nil
 }
 
-func isPassword(password string) (bool, error) {
+func validatePassword(password string) (bool, error) {
 	var valid bool
 	var err error
 	var upper, lower, number, special, length bool
