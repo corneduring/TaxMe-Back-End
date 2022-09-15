@@ -8,9 +8,11 @@ import (
 )
 
 func main() {
-	http.HandleFunc("/login", dataHandlers.DataHandler)
-
 	database := db.ConnectDatabase()
+
+	http.HandleFunc("/login", dataHandlers.Login(database))
+	http.HandleFunc("/signup", dataHandlers.SignUp(database))
+
 	defer database.Close()
 
 	db.RunScript("db/db.sql", database)
