@@ -4,21 +4,27 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
+	"time"
 )
 
-type LoginData struct {
-	Email    string
-	Password string
+type UserData struct {
+	Email             string
+	Password          string
+	PasswordValidator string
 }
 
-type SignUpData struct {
-	Email     string
-	Password1 string
-	Password2 string
+type Calculation struct {
+	CalculationID    int
+	UserID           int
+	PaymentFrequency string
+	Salary           decimal.Decimal
+	Tax              decimal.Decimal
+	Timestamp        time.Time
 }
 
 func enableCors(w *http.ResponseWriter) {
@@ -31,24 +37,33 @@ func Login(database *sql.DB) http.HandlerFunc {
 		enableCors(&writer)
 
 		//Convert the request into a readable JSON string
-		data, err := ioutil.ReadAll(request.Body)
+		requestString, err := ioutil.ReadAll(request.Body)
 		if err != nil {
 			writer.Write([]byte("Could not read your login data!"))
 		}
 
 		//Parse the JSON string into a struct
-		var loginData LoginData
-		err = json.Unmarshal(data, &loginData)
+		var loginData UserData
+		err = json.Unmarshal(requestString, &loginData)
 		if err != nil {
 			writer.Write([]byte("Could not read your login data!"))
 		}
 
+		//Prepare SQL statement
+		stmt, err := database.Prepare("SELECT * FROM users WHERE email=$1")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmt.Close()
+
 		//Validate whether the email entered already exists
-		result, err := database.Exec("SELECT * FROM users WHERE email=$1", loginData.Email)
+		result, err := stmt.Exec("SELECT * FROM users WHERE email=$1", loginData.Email)
 		if err != nil {
 			log.Print(err)
+			writer.Write([]byte("An error has occured. Could not log you in."))
 		}
 
+		//Count the amount of rows retrieved from the database
 		valid, _ := result.RowsAffected()
 		if valid != 1 {
 			writer.Write([]byte("The email you entered does not exist. Try signing up for an account first."))
@@ -74,24 +89,33 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 		enableCors(&writer)
 
 		//Convert the request into a readable JSON string
-		data, err := ioutil.ReadAll(request.Body)
+		requestString, err := ioutil.ReadAll(request.Body)
 		if err != nil {
 			writer.Write([]byte("Couldn't read your data!"))
 		}
 
 		//Parse the JSON string into a struct
-		var signUpData SignUpData
-		err = json.Unmarshal(data, &signUpData)
+		var signUpData UserData
+		err = json.Unmarshal(requestString, &signUpData)
 		if err != nil {
 			writer.Write([]byte("Couldn't read your data!"))
 		}
 
+		//Prepare SQL statement
+		stmt, err := database.Prepare("SELECT * FROM users WHERE email = $1")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmt.Close()
+
 		//Validate whether the email entered already exists
-		result, err := database.Exec("SELECT * FROM users WHERE email = $1", signUpData.Email)
+		result, err := stmt.Exec("SELECT * FROM users WHERE email = $1", signUpData.Email)
 		if err != nil {
 			log.Print(err)
+			writer.Write([]byte("Couldn't validate your email"))
 		}
 
+		//Count the amount of rows retrieved from the database
 		valid, _ := result.RowsAffected()
 		if valid == 1 {
 			writer.Write([]byte("The email entered already exists!"))
@@ -106,19 +130,71 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 		}
 
 		//Validate the user's passwords to make it more secure
-		validPassword, err := validatePassword(signUpData.Password1)
+		validPassword, err := validatePassword(signUpData.Password)
 		if !validPassword {
 			writer.Write([]byte(err.Error()))
 			return
 		}
 
 		//Validate whether the user's passwords match
-		if signUpData.Password1 != signUpData.Password2 {
+		if signUpData.Password != signUpData.PasswordValidator {
 			writer.Write([]byte("Your passwords don't match!"))
 			return
 		}
 
-		_, err = database.Exec("INSERT INTO users(email, password) VALUES ($1, $2)", signUpData.Email, signUpData.Password1)
+		_, err = database.Exec("INSERT INTO users(email, password) VALUES ($1, $2)", signUpData.Email, signUpData.Password)
+	}
+}
+
+func GetHistory(database *sql.DB) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		enableCors(&writer)
+
+		//Convert the request into a readable JSON string
+		requestString, err := ioutil.ReadAll(request.Body)
+		if err != nil {
+			writer.Write([]byte("Couldn't read your data!"))
+		}
+
+		//Parse the JSON string into a struct
+		var loggedInUser UserData
+		err = json.Unmarshal(requestString, &loggedInUser)
+		if err != nil {
+			writer.Write([]byte("Couldn't read your data!"))
+		}
+
+		stmt, err := database.Prepare("SELECT * FROM calculations WHERE user_id = (SELECT user_id FROM users WHERE email = $1);")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer stmt.Close()
+
+		calculations, err := stmt.Query(loggedInUser.Email)
+		if err != nil {
+			log.Print(err)
+			writer.Write([]byte("An error has occured. Could not retrieve your calculations."))
+		}
+
+		var history []Calculation
+		var response []byte
+		defer calculations.Close()
+
+		for calculations.Next() {
+			var calculation Calculation
+
+			if err := calculations.Scan(&calculation.CalculationID, &calculation.UserID, &calculation.PaymentFrequency, &calculation.Salary, &calculation.Tax, &calculation.Timestamp); err != nil {
+				log.Print(err)
+			}
+
+			history = append(history, calculation)
+		}
+		response, err = json.MarshalIndent(history, "", "    ")
+		if err != nil {
+			log.Print(err)
+			return
+		}
+
+		writer.Write(response)
 	}
 }
 
