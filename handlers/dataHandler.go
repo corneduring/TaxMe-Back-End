@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/shopspring/decimal"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -22,8 +21,8 @@ type Calculation struct {
 	CalculationID    int
 	UserID           int
 	PaymentFrequency string
-	Salary           decimal.Decimal
-	Tax              decimal.Decimal
+	Salary           string
+	Tax              string
 	Timestamp        time.Time
 }
 
@@ -57,7 +56,7 @@ func Login(database *sql.DB) http.HandlerFunc {
 		defer stmt.Close()
 
 		//Validate whether the email entered already exists
-		result, err := stmt.Exec("SELECT * FROM users WHERE email=$1", loginData.Email)
+		result, err := stmt.Exec(loginData.Email)
 		if err != nil {
 			log.Print(err)
 			writer.Write([]byte("An error has occured. Could not log you in."))
@@ -109,7 +108,7 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 		defer stmt.Close()
 
 		//Validate whether the email entered already exists
-		result, err := stmt.Exec("SELECT * FROM users WHERE email = $1", signUpData.Email)
+		result, err := stmt.Exec(signUpData.Email)
 		if err != nil {
 			log.Print(err)
 			writer.Write([]byte("Couldn't validate your email"))

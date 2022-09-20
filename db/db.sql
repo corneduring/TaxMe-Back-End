@@ -14,8 +14,8 @@ CREATE TABLE calculations (
                 calculation_id serial,
                 user_id int,
                 payment_frequency varchar(10),
-                salary numeric(18, 4),
-                tax numeric(18, 4),
+                salary numeric(18, 2),
+                tax numeric(18, 2),
                 "timestamp" timestamp,
                 PRIMARY KEY (calculation_id),
                 FOREIGN KEY (user_id) REFERENCES users (user_id)
