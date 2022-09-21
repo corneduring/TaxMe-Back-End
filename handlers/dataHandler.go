@@ -53,6 +53,8 @@ func Login(database *sql.DB) http.HandlerFunc {
 		stmt, err := database.Prepare("SELECT * FROM users WHERE email=$1")
 		if err != nil {
 			log.Fatal(err)
+			writer.Write([]byte("An error has occured. Could not validate your email."))
+			return
 		}
 		defer stmt.Close()
 
@@ -60,7 +62,8 @@ func Login(database *sql.DB) http.HandlerFunc {
 		result, err := stmt.Exec(loginData.Email)
 		if err != nil {
 			log.Print(err)
-			writer.Write([]byte("An error has occured. Could not log you in."))
+			writer.Write([]byte("An error has occured. Could not validate your email."))
+			return
 		}
 
 		//Count the amount of rows retrieved from the database
@@ -70,14 +73,22 @@ func Login(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		//Validate whether the password entered by the user matches the corresponding email in the database
-		result, err = database.Exec("SELECT * FROM users WHERE email=$1 AND password=$2", loginData.Email, loginData.Password)
+		//Prepare SQL statement
+		stmt, err = database.Prepare("SELECT * FROM users WHERE email=$1 AND password=$2")
 		if err != nil {
 			log.Print(err)
+			writer.Write([]byte("An error has occured. Could not log you in."))
+			return
+		}
+		//Validate whether the password entered by the user matches the corresponding email in the database
+		result, err = stmt.Exec(loginData.Email, loginData.Password)
+		if err != nil {
+			log.Print(err)
+			writer.Write([]byte("An error has occured. Could not log you in."))
+			return
 		}
 
-		valid, _ = result.RowsAffected()
-		if valid != 1 {
+		if valid, _ = result.RowsAffected(); valid != 1 {
 			writer.Write([]byte("Your password is invalid!"))
 			return
 		}
@@ -105,6 +116,8 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 		stmt, err := database.Prepare("SELECT * FROM users WHERE email = $1")
 		if err != nil {
 			log.Fatal(err)
+			writer.Write([]byte("Couldn't validate your email"))
+			return
 		}
 		defer stmt.Close()
 
@@ -113,6 +126,7 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 		if err != nil {
 			log.Print(err)
 			writer.Write([]byte("Couldn't validate your email"))
+			return
 		}
 
 		//Count the amount of rows retrieved from the database
@@ -142,7 +156,21 @@ func SignUp(database *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_, err = database.Exec("INSERT INTO users(email, password) VALUES ($1, $2)", signUpData.Email, signUpData.Password)
+		//Prepare SQL statement
+		stmt, err = database.Prepare("INSERT INTO users(email, password) VALUES ($1, $2)")
+		if err != nil {
+			log.Print(err)
+			writer.Write([]byte("An error has occured. Could not create your account."))
+			return
+		}
+
+		//Create new user's account
+		_, err = stmt.Exec(signUpData.Email, signUpData.Password)
+		if err != nil {
+			log.Print(err)
+			writer.Write([]byte("An error has occured. Could not create your account."))
+			return
+		}
 	}
 }
 
@@ -166,6 +194,8 @@ func GetHistory(database *sql.DB) http.HandlerFunc {
 		stmt, err := database.Prepare("SELECT * FROM calculations WHERE user_id = (SELECT user_id FROM users WHERE email = $1);")
 		if err != nil {
 			log.Fatal(err)
+			writer.Write([]byte("An error has occured. Could not retrieve your calculations."))
+			return
 		}
 		defer stmt.Close()
 
@@ -173,6 +203,7 @@ func GetHistory(database *sql.DB) http.HandlerFunc {
 		if err != nil {
 			log.Print(err)
 			writer.Write([]byte("An error has occured. Could not retrieve your calculations."))
+			return
 		}
 
 		var history []Calculation
