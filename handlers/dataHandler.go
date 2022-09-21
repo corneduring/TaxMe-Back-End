@@ -20,9 +20,10 @@ type UserData struct {
 type Calculation struct {
 	CalculationID    int
 	UserID           int
-	PaymentFrequency string
+	PaymentFrequency string `json:"Frequency"`
 	Salary           string
-	Tax              string
+	MonthlyTax       string
+	YearlyTax        string
 	Timestamp        time.Time
 }
 
@@ -181,7 +182,7 @@ func GetHistory(database *sql.DB) http.HandlerFunc {
 		for calculations.Next() {
 			var calculation Calculation
 
-			if err := calculations.Scan(&calculation.CalculationID, &calculation.UserID, &calculation.PaymentFrequency, &calculation.Salary, &calculation.Tax, &calculation.Timestamp); err != nil {
+			if err := calculations.Scan(&calculation.CalculationID, &calculation.UserID, &calculation.Salary, &calculation.PaymentFrequency, &calculation.MonthlyTax, &calculation.YearlyTax, &calculation.Timestamp); err != nil {
 				log.Print(err)
 			}
 
