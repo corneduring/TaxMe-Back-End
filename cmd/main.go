@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 	"tax_me/db"
-	"tax_me/handlers"
+	dataHandlers "tax_me/handlers"
 )
 
 func main() {

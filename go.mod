@@ -1,4 +1,4 @@
-module first_webapp
+module tax_me
 
 go 1.18
 
